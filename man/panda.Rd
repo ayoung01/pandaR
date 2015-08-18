@@ -7,7 +7,7 @@
 panda(motif, expr = NULL, ppi = NULL, alpha = 0.1, hamming = 1e-05,
   k = NA, output = c("regulatory", "coexpression", "cooperative"),
   zScale = TRUE, progress = FALSE, randomize = "None",
-  cor.method = "pearson")
+  cor.method = "pearson", scale.by.present = FALSE)
 }
 \arguments{
 \item{motif}{A motif dataset, a data.frame, matrix or exprSet containing 3 columns.

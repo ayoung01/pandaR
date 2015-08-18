@@ -47,7 +47,8 @@ panda <- function( motif,
                 zScale=TRUE,
                 progress=FALSE,
                 randomize="None",
-                cor.method="pearson"){
+                cor.method="pearson",
+                scale.by.present=FALSE){
     if(progress)
         print('Initializing and validating')
     exprData  <- expr
