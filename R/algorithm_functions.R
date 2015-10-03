@@ -11,7 +11,7 @@
 #' transcription factor 2 (column 2) and a score (column 3) for the interaction.
 #' @param alpha value to be used for update variable, alpha (default=0.1)
 #' @param hamming value at which to terminate the process based on hamming distance (default 10^-5)
-#' @param k sets the maximum number of iterations PANDA can run before exiting.
+#' @param iter sets the maximum number of iterations PANDA can run before exiting.
 #' @param progress Boolean to indicate printing of output for algorithm progress.
 #' @param output a vector containing which networks to return.  Options include "regulatory",
 #' "coregulatory", "cooperative".
@@ -24,6 +24,7 @@
 #' @keywords keywords
 #' @importFrom matrixStats rowSds
 #' @importFrom matrixStats colSds
+#' @importFrom Biobase assayData
 #' @export
 #' @return An object of class "panda" containing matrices describing networks achieved by convergence
 #' with PANDA algorithm.\cr
@@ -37,59 +38,44 @@
 #' @references
 #' Glass K, Huttenhower C, Quackenbush J, Yuan GC. Passing Messages Between Biological Networks
 #' to Refine Predicted Interactions. PLoS One. 2013 May 318(5):e64832.
-panda <- function( motif,
-                expr=NULL,
-                ppi=NULL,
-                alpha=0.1,
-                hamming=0.00001,
-                k=NA,
-                output=c('regulatory','coexpression','cooperative'),
-                zScale=TRUE,
-                progress=FALSE,
-                randomize="None",
-                cor.method="pearson",
-                scale.by.present=FALSE){
+panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
+    iter=NA,output=c('regulatory','coexpression','cooperative'),
+    zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
+    scale.by.present=FALSE){
+
     if(progress)
         print('Initializing and validating')
-    exprData  <- expr
-    motifData <- motif
-    ppiData   <- ppi
 
     if(class(expr)=="ExpressionSet")
-        exprData <- expr@assayData
+        expr <- assayData(expr)[["exprs"]]
 
-    # Create vectors for TF names and Gene names from Motif dataset
-    tf.names   <- sort(unique(motifData[,1]))
+    # Create vectors for TF names and Gene names from motif dataset
+    tf.names   <- sort(unique(motif[,1]))
+    gene.names <- sort(unique(rownames(expr)))
     num.TFs    <- length(tf.names)
-    if (is.null(exprData)){
+    num.genes  <- length(gene.names)
+
+    if (is.null(expr)){
         # Use only the motif data here for the gene list
-        gene.names <- sort(unique(motifData[,2]))
-        num.genes  <- length(gene.names)
         num.conditions <- 0
         if (randomize!="None"){
-            warning("Randomization ignored because gene expression is not used.")
-            randomize <- "None"
+          warning("Randomization ignored because gene expression is not used.")
+          randomize <- "None"
         }
     } else {
         # Use the motif data AND the expr data (if provided) for the gene list
-        gene.names <- sort(intersect(motifData[,2],rownames(exprData)))
-        num.genes  <- length(gene.names)
-
-        # Filter out the expr genes without motif data
-        exprData <- exprData[rownames(exprData) %in% gene.names,]
-
         # Keep everything sorted alphabetically
-        exprData      <- exprData[order(rownames(exprData)),]
-        num.conditions <- ncol(exprData)
+        expr <- expr[order(rownames(expr)),]
+        num.conditions <- ncol(expr)
         if (randomize=='within.gene'){
-            exprData <- t(apply(exprData, 1, sample))
-            if(progress)
-                print("Randomizing by reordering each gene's expression")
+          expr <- t(apply(expr, 1, sample))
+          if(progress)
+            print("Randomizing by reordering each gene's expression")
         } else if (randomize=='by.genes'){
-            rownames(exprData) <- sample(rownames(exprData))
-            exprData           <- exprData[order(rownames(exprData)),]
-            if(progress)
-                print("Randomizing by reordering each gene labels")
+          rownames(expr) <- sample(rownames(expr))
+          expr           <- expr[order(rownames(expr)),]
+          if(progress)
+            print("Randomizing by reordering each gene labels")
         }
     }
 
@@ -107,44 +93,34 @@ panda <- function( motif,
     } else {
         
         if(scale.by.present){
-            num.positive=(exprData>0)%*%t((exprData>0))
-            geneCoreg <- cor(t(exprData), method=cor.method, use="pairwise.complete.obs")*(num.positive/num.conditions)
-
+            num.positive=(expr>0)%*%t((expr>0))
+            geneCoreg <- cor(t(expr), method=cor.method, use="pairwise.complete.obs")*(num.positive/num.conditions)
         } else {
-            geneCoreg <- cor(t(exprData), method=cor.method, use="pairwise.complete.obs")
+            geneCoreg <- cor(t(expr), method=cor.method, use="pairwise.complete.obs")
         }
         if(progress)
             print('Verified sufficient samples')
     }
 
-
+    # Prior Regulatory Network
+    Idx1=match(motif[,1], tf.names);
+    Idx2=match(motif[,2], gene.names);
+    Idx=(Idx2-1)*num.TFs+Idx1;
+    regulatoryNetwork=matrix(data=0, num.TFs, num.genes);
+    regulatoryNetwork[Idx]=motif[,3]
+    
+    # ppi data
     # If no ppi data is given, we use the identity matrix
-    if (is.null(ppiData)){
-        ppiData <- diag(num.TFs)
+    if (is.null(ppi)){
+        ppi <- diag(num.TFs)
     }
-
-    # Convert 3 column format to matrix format
-    regulatoryNetwork <- spreadNet(motifData)
-
-    # sort the genes (columns)
-    regulatoryNetwork <- as.matrix(regulatoryNetwork[,order(colnames(regulatoryNetwork))])
-
-    # Filter out any motifs that are not in expr dataset (if given)
-    if (!is.null(exprData)){
-        regulatoryNetwork <- regulatoryNetwork[,colnames(regulatoryNetwork) %in% gene.names]
-    }
-
-    # store initial motif network (alphabetized for rows and columns)
-    starting.motifs <- regulatoryNetwork
-
-    # ppiData Data
     tfCoopNetwork=diag(num.TFs)
-    Idx1=match(ppiData[,1], tf.names)
-    Idx2=match(ppiData[,2], tf.names)
-    Idx=(Idx2-1)*num.TFs+Idx1
-    tfCoopNetwork[Idx[!is.na(Idx)]]=as.numeric(ppiData[,3])[!is.na(Idx)]
-    Idx=(Idx1-1)*num.TFs+Idx2
-    tfCoopNetwork[Idx[!is.na(Idx)]]=as.numeric(ppiData[,3])[!is.na(Idx)]
+    Idx1=match(ppi[,1], tf.names);
+    Idx2=match(ppi[,2], tf.names);
+    Idx=(Idx2-1)*num.TFs+Idx1;
+    tfCoopNetwork[Idx]=ppi[,3];
+    Idx=(Idx1-1)*num.TFs+Idx2;
+    tfCoopNetwork[Idx]=ppi[,3];
     colnames(tfCoopNetwork) <- tf.names
     rownames(tfCoopNetwork) <- tf.names
 
@@ -153,9 +129,9 @@ panda <- function( motif,
 
     if(progress)
         print('Normalizing networks...')
-    regulatoryNetwork=normalizeNetwork(regulatoryNetwork)
-    tfCoopNetwork=normalizeNetwork(tfCoopNetwork)
-    geneCoreg=normalizeNetwork(geneCoreg)
+    regulatoryNetwork = normalizeNetwork(regulatoryNetwork)
+    tfCoopNetwork     = normalizeNetwork(tfCoopNetwork)
+    geneCoreg         = normalizeNetwork(geneCoreg)
 
     if(progress)
         print('Leaning Network...')
@@ -166,8 +142,8 @@ panda <- function( motif,
     if(progress)
         print("Using tanimoto similarity")
     while(hamming_cur>hamming){
-        if ((!is.na(k))&&step>=k){
-            stop(paste("Reached maximum iterations, k =",k),sep="")
+        if ((!is.na(iter))&&step>=iter){
+            stop(paste("Reached maximum iterations, iter =",iter),sep="")
         }
         Responsibility=tanimoto(tfCoopNetwork, regulatoryNetwork)
         Availability=tanimoto(regulatoryNetwork, geneCoreg)
@@ -176,9 +152,9 @@ panda <- function( motif,
         hamming_cur=sum(abs(regulatoryNetwork-RA))/(num.TFs*num.genes)
         regulatoryNetwork=minusAlpha*regulatoryNetwork + alpha*RA
 
-        ppiData=tanimoto(regulatoryNetwork, t(regulatoryNetwork))
-        ppiData=update.diagonal(ppiData, num.TFs, alpha, step)
-        tfCoopNetwork=minusAlpha*tfCoopNetwork + alpha*ppiData
+        ppi=tanimoto(regulatoryNetwork, t(regulatoryNetwork))
+        ppi=update.diagonal(ppi, num.TFs, alpha, step)
+        tfCoopNetwork=minusAlpha*tfCoopNetwork + alpha*ppi
 
         CoReg2=tanimoto(t(regulatoryNetwork), regulatoryNetwork)
         CoReg2=update.diagonal(CoReg2, num.genes, alpha, step)
@@ -196,7 +172,6 @@ panda <- function( motif,
 }
 
 prepResult <- function(zScale, output, regulatoryNetwork, geneCoreg, tfCoopNetwork){
-
     resList <- list()
     if (!zScale){
         regulatoryNetwork <- pnorm(regulatoryNetwork)
@@ -285,7 +260,6 @@ dFunction<-function(X,Y){
     A[A<0]<-0
     A
 }
-
 
 update.diagonal<-function(diagMat, num, alpha, step){
     seqs = seq(1, num*num, num+1)
@@ -414,7 +388,6 @@ targetedGenes <- function(x, tfs){
     targeted <- colnames(x@regNet)[edgeexists]
     targeted
 }
-
 
 #' Plot graph
 #'

@@ -5,7 +5,7 @@
 \title{Passing Messages between Biological Networks to Refine Predicted Interactions}
 \usage{
 panda(motif, expr = NULL, ppi = NULL, alpha = 0.1, hamming = 1e-05,
-  k = NA, output = c("regulatory", "coexpression", "cooperative"),
+  iter = NA, output = c("regulatory", "coexpression", "cooperative"),
   zScale = TRUE, progress = FALSE, randomize = "None",
   cor.method = "pearson", scale.by.present = FALSE)
 }
@@ -24,7 +24,7 @@ transcription factor 2 (column 2) and a score (column 3) for the interaction.}
 
 \item{hamming}{value at which to terminate the process based on hamming distance (default 10^-5)}
 
-\item{k}{sets the maximum number of iterations PANDA can run before exiting.}
+\item{iter}{sets the maximum number of iterations PANDA can run before exiting.}
 
 \item{output}{a vector containing which networks to return.  Options include "regulatory",
 "coregulatory", "cooperative".}
