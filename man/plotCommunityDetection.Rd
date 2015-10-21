@@ -20,11 +20,13 @@ Optionally return a list with the graph and community.
 }
 \description{
 This function performs community detection on an undirected PANDA network.
+The function optionally returns the graph and community.
 }
 \examples{
 # start with some toy PANDA output
 mat <- cbind(rep(1:5, each=10), rep(seq(11,20),5), sample(100, 50)/100)
-plotCommunityDetection(mat)
+x =plotCommunityDetection(mat)
+str(x)
 
 #example of very different edges
 set.seed(1)

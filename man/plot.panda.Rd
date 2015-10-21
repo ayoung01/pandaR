@@ -4,7 +4,7 @@
 \alias{plot.panda}
 \title{Plot.panda}
 \usage{
-plot.panda(x, ...)
+\method{plot}{panda}(x, ...)
 }
 \arguments{
 \item{x}{an object of class "panda"}

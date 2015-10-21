@@ -247,6 +247,7 @@ multiplot <- function(...,plotlist=NULL,cols=1,layout=NULL) {
 #' Community detection plot
 #' 
 #' This function performs community detection on an undirected PANDA network.
+#' The function optionally returns the graph and community.
 #'
 #' @param x Toy PANDA output represented as a TF, Gene, and Score.
 #' @param scaleEdge Visualization parameter for the edges.
@@ -267,7 +268,8 @@ multiplot <- function(...,plotlist=NULL,cols=1,layout=NULL) {
 #' 
 #' # start with some toy PANDA output
 #' mat <- cbind(rep(1:5, each=10), rep(seq(11,20),5), sample(100, 50)/100)
-#' plotCommunityDetection(mat)
+#' x =plotCommunityDetection(mat)
+#' str(x)
 #'
 #' #example of very different edges
 #' set.seed(1)
