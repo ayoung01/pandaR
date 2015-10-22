@@ -4,7 +4,7 @@
 \alias{panda}
 \title{Passing Messages between Biological Networks to Refine Predicted Interactions}
 \usage{
-panda(motif, expr = NULL, ppi = NULL, alpha = 0.1, hamming = 1e-05,
+panda(motif, expr = NULL, ppi = NULL, alpha = 0.1, hamming = 0.001,
   iter = NA, output = c("regulatory", "coexpression", "cooperative"),
   zScale = TRUE, progress = FALSE, randomize = "None",
   cor.method = "pearson", scale.by.present = FALSE)

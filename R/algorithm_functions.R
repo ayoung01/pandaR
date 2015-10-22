@@ -38,7 +38,7 @@
 #' @references
 #' Glass K, Huttenhower C, Quackenbush J, Yuan GC. Passing Messages Between Biological Networks
 #' to Refine Predicted Interactions. PLoS One. 2013 May 318(5):e64832.
-panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
+panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     iter=NA,output=c('regulatory','coexpression','cooperative'),
     zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
     scale.by.present=FALSE){
