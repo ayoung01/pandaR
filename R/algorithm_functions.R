@@ -81,7 +81,7 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
 
     # Bad data checking
     if (num.genes==0){
-        stop("Error validating data.  No matched genes.\n  Please ensure that gene names in expression file match gene names in motif file.")
+        stop("Error validating data.  No matched genes.\n  Please ensure that gene names in expression data match gene names in motif data")
     }
 
     if(num.conditions==0) {
@@ -100,6 +100,11 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
         }
         if(progress)
             print('Verified sufficient samples')
+    }
+    
+    if (any(duplicated(motif))) {
+      warning("Duplicate edges have been found in the motif data. Weights will be summed.")
+      motif <- aggregate(motif[,3], by=list(motif[,1], motif[,2]), FUN=sum)
     }
 
     # Prior Regulatory Network
@@ -192,6 +197,7 @@ prepResult <- function(zScale, output, regulatoryNetwork, geneCoreg, tfCoopNetwo
     res <- pandaObj(regNet=regulatoryNetwork, coregNet=geneCoreg, coopNet=tfCoopNetwork)
     res
 }
+
 normalizeNetwork<-function(X){
     X <- as.matrix(X)
 
