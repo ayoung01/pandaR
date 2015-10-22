@@ -111,18 +111,19 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
     
     # ppi data
     # If no ppi data is given, we use the identity matrix
-    if (is.null(ppi)){
+    if(is.null(ppi)){
         ppi <- diag(num.TFs)
+    } else {
+        tfCoopNetwork=diag(num.TFs)
+        Idx1=match(ppi[,1], tf.names);
+        Idx2=match(ppi[,2], tf.names);
+        Idx=(Idx2-1)*num.TFs+Idx1;
+        tfCoopNetwork[Idx]=ppi[,3];
+        Idx=(Idx1-1)*num.TFs+Idx2;
+        tfCoopNetwork[Idx]=ppi[,3];
+        colnames(tfCoopNetwork) <- tf.names
+        rownames(tfCoopNetwork) <- tf.names
     }
-    tfCoopNetwork=diag(num.TFs)
-    Idx1=match(ppi[,1], tf.names);
-    Idx2=match(ppi[,2], tf.names);
-    Idx=(Idx2-1)*num.TFs+Idx1;
-    tfCoopNetwork[Idx]=ppi[,3];
-    Idx=(Idx1-1)*num.TFs+Idx2;
-    tfCoopNetwork[Idx]=ppi[,3];
-    colnames(tfCoopNetwork) <- tf.names
-    rownames(tfCoopNetwork) <- tf.names
 
     ## Run PANDA ##
     tic=proc.time()[3]
