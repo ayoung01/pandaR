@@ -90,14 +90,14 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   false.idx <- c()
   if (mode=="augment") {
     tf.idx = list()
-    chip.seq.table <- table(motif[,1])
-    for (tf in names(chip.seq.table)) {
+    motif.table <- table(motif[,1])
+    for (tf in names(motif.table)) {
       tf.idx[[tf]] <- which(net$TF==tf)
     }
     # sample net with same distribution of TFs as the motif data
-    for (i in 1:length(chip.seq.table)) {
-      tf <- names(chip.seq.table)[i]
-      false.idx <- c(false.idx, sample(tf.idx[[tf]], chip.seq.table[i]))
+    for (i in 1:length(motif.table)) {
+      tf <- names(motif.table)[i]
+      false.idx <- c(false.idx, sample(tf.idx[[tf]], motif.table[i]))
     }
     true.idx <- which(paste0(net$TF, net$Gene)%in%paste0(motif$TF, motif$Gene))
     false.idx <- setdiff(false.idx, true.idx)
@@ -158,19 +158,17 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
 #' plotZbyTF(regnet,regnet, pandaToyData$motif, hasPrior=TRUE)
 #'
 plotZbyTF <- function(x, y, motif, hasPrior=TRUE){
-  chip.seq.table <- aggregate(motif[,3], list(TF=motif[,1]), sum)
-  chip.seq.counts <- data.frame(TF=chip.seq.table$TF, outdegree=chip.seq.table$x)
-  attach(chip.seq.counts)
-  chip.seq.counts <- chip.seq.counts[order(outdegree),]
-  quant <- quantile(outdegree)
-  chip.seq.counts$q <- 1
-  chip.seq.counts$q[which(outdegree>=quant[2])] <- 2
-  chip.seq.counts$q[which(outdegree>=quant[3])] <- 3
-  chip.seq.counts$q[which(outdegree>=quant[4])] <- 4
-  detach(chip.seq.counts)
+  motif.table <- aggregate(motif[,3], list(TF=motif[,1]), sum)
+  motif.counts <- data.frame(TF=motif.table$TF, outdegree=motif.table$x)
+  motif.counts <- motif.counts[order(motif.counts$outdegree),]
+  quant <- quantile(motif.counts$outdegree)
+  motif.counts$q <- 1
+  motif.counts$q[which(motif.counts$outdegree>=quant[2])] <- 2
+  motif.counts$q[which(motif.counts$outdegree>=quant[3])] <- 3
+  motif.counts$q[which(motif.counts$outdegree>=quant[4])] <- 4
   tfs.q <- list()
   for (i in 1:4){
-    tfs.q[[i]] <- subset(chip.seq.counts, q==i)$TF
+    tfs.q[[i]] <- subset(motif.counts, q==i)$TF
   }
   x = melt.array(x)
   y = melt.array(y)
