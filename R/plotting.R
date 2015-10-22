@@ -70,7 +70,7 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 xlab
 #' @importFrom ggplot2 ylab
-#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 aes_string
 #' @importFrom ggplot2 scale_color_discrete
 #' @export 
 #' @examples
@@ -78,7 +78,7 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
 #' data(pandaToyData)
 #' data(pandaResult)
 #' regnet = slot(pandaResult,"regNet")
-#' with(pandaToyData, testMotif(regnet, motif, mode="augment", expression,ppi, hamming=1))
+#' with(pandaToyData, testMotif(regnet, motif, mode="augment", expression, ppi, hamming=1))
 #'
 testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   if(!mode%in%c("augment","remove")){
@@ -112,9 +112,6 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   }
   panda.mod <- panda(motif.mod, expr, ppi, ...)
   reg.mod <- slot(panda.mod,"regNet")
-  rownames(reg.mod) = colnames(slot(panda.mod,"coopNet"))
-  colnames(reg.mod) = colnames(slot(panda.mod,"coregNet"))
-  
   net.mod <- melt.array(reg.mod)
   colnames(net.mod) <- c("TF", "Gene", "Score")
   
@@ -143,7 +140,7 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 xlab
 #' @importFrom ggplot2 ylab
-#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 aes_string
 #' @importFrom ggplot2 xlim
 #' @importFrom ggplot2 ylim
 #' @importFrom ggplot2 ggtitle

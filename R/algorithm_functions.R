@@ -121,6 +121,10 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     tfCoopNetwork <- diag(num.TFs)
     # Else we convert our two-column data.frame to a matrix
     if (!is.null(ppi)){
+      if (any(duplicated(ppi))) {
+        warning("Duplicate edges have been found in the PPI data. Weights will be summed.")
+        ppi <- aggregate(ppi[,3], by=list(ppi[,1], ppi[,2]), FUN=sum)
+      }
       Idx1 <- match(ppi[,1], tf.names);
       Idx2 <- match(ppi[,2], tf.names);
       Idx <- (Idx2-1)*num.TFs+Idx1;
