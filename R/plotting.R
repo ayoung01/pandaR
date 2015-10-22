@@ -14,7 +14,7 @@
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 xlab
 #' @importFrom ggplot2 ylab
-#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 aes_string
 #' @importFrom ggplot2 geom_abline
 #' @importFrom ggplot2 geom_point
 #' @importFrom ggplot2 stat_binhex
@@ -38,7 +38,7 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
   x = melt.array(slot(x,"regNet"))
   y = melt.array(slot(y,"regNet"))
   d <- merge(x,y,by=colnames(x)[1:2])
-  p <- ggplot(d, aes(value.x, value.y)) +
+  p <- ggplot(d, aes_string(x="value.x", y="value.y")) +
     xlab("Network 1 Z-score") + ylab("Network 2 Z-score")
     # Should update these to say Network X and Network Y...
   if (addLine) {
@@ -121,7 +121,7 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   net$x <- 1:nrow(net) %in% false.idx
   d <- merge(net, net.mod, by=c("TF", "Gene"), all.x=TRUE, sort=FALSE)
   d <- d[order(d$x),]
-  p = ggplot(d, aes(Score.x, Score.y, color=x==TRUE)) + geom_point(shape=1) +
+  p = ggplot(d, aes_string(x="Score.x", y="Score.y", color="x==TRUE")) + geom_point(shape=1) +
     xlab("Model network weights") + ylab("Modified network weights") +
     scale_color_discrete(name="", labels=c("Model edges", "False edges"))
   p
@@ -168,7 +168,7 @@ plotZbyTF <- function(x, y, motif, hasPrior=TRUE){
   motif.counts$q[which(motif.counts$outdegree>=quant[4])] <- 4
   tfs.q <- list()
   for (i in 1:4){
-    tfs.q[[i]] <- subset(motif.counts, q==i)$TF
+    tfs.q[[i]] <- motif.counts[motif.counts$q==i, ]$TF
   }
   x = melt.array(x)
   y = melt.array(y)
@@ -178,13 +178,13 @@ plotZbyTF <- function(x, y, motif, hasPrior=TRUE){
   pList <- list()
   
   if (!hasPrior) {
-    d <- subset(d, Motif==0)
+    d <- d[d$Motif==0, ]
   } else {
-    d <- subset(d, Motif > 0)
+    d <- d[d$Motif>0, ]
   }
   lim <- c(min(d$Z.x, d$Z.y), max(d$Z.x, d$Z.y))
   for (i in 1:4){
-    p <- ggplot(subset(d, TF%in%tfs.q[[i]]), aes(Z.x, Z.y)) +
+    p <- ggplot(d[d$TF%in%tfs.q[[i]], ], aes_string(x="Z.x", y="Z.y")) +
       geom_abline(intercept=0, slope=1, colour="red") + ggtitle("Q"%+%i) +
       xlim(lim) + ylim(lim)
     if (!hasPrior) {
