@@ -108,6 +108,8 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     Idx=(Idx2-1)*num.TFs+Idx1;
     regulatoryNetwork=matrix(data=0, num.TFs, num.genes);
     regulatoryNetwork[Idx]=motif[,3]
+    colnames(regulatoryNetwork) <- gene.names
+    rownames(regulatoryNetwork) <- tf.names
     
     # PPI data
     # If no ppi data is given, we use the identity matrix
