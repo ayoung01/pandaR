@@ -109,18 +109,18 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
     regulatoryNetwork=matrix(data=0, num.TFs, num.genes);
     regulatoryNetwork[Idx]=motif[,3]
     
-    # ppi data
+    # PPI data
     # If no ppi data is given, we use the identity matrix
-    if (is.null(ppi)){
-        ppi <- diag(num.TFs)
+    tfCoopNetwork <- diag(num.TFs)
+    # Else we convert our two-column data.frame to a matrix
+    if (!is.null(ppi)){
+      Idx1 <- match(ppi[,1], tf.names);
+      Idx2 <- match(ppi[,2], tf.names);
+      Idx <- (Idx2-1)*num.TFs+Idx1;
+      tfCoopNetwork[Idx] <- ppi[,3];
+      Idx <- (Idx1-1)*num.TFs+Idx2;
+      tfCoopNetwork[Idx] <- ppi[,3];
     }
-    tfCoopNetwork=diag(num.TFs)
-    Idx1=match(ppi[,1], tf.names);
-    Idx2=match(ppi[,2], tf.names);
-    Idx=(Idx2-1)*num.TFs+Idx1;
-    tfCoopNetwork[Idx]=ppi[,3];
-    Idx=(Idx1-1)*num.TFs+Idx2;
-    tfCoopNetwork[Idx]=ppi[,3];
     colnames(tfCoopNetwork) <- tf.names
     rownames(tfCoopNetwork) <- tf.names
 
