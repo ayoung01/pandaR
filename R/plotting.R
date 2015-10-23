@@ -14,7 +14,7 @@
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 xlab
 #' @importFrom ggplot2 ylab
-#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 aes_string
 #' @importFrom ggplot2 geom_abline
 #' @importFrom ggplot2 geom_point
 #' @importFrom ggplot2 stat_binhex
@@ -38,7 +38,7 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
   x = melt.array(slot(x,"regNet"))
   y = melt.array(slot(y,"regNet"))
   d <- merge(x,y,by=colnames(x)[1:2])
-  p <- ggplot(d, aes(value.x, value.y)) +
+  p <- ggplot(d, aes_string(x="value.x", y="value.y")) +
     xlab("Network 1 Z-score") + ylab("Network 2 Z-score")
     # Should update these to say Network X and Network Y...
   if (addLine) {
@@ -70,7 +70,7 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 xlab
 #' @importFrom ggplot2 ylab
-#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 aes_string
 #' @importFrom ggplot2 scale_color_discrete
 #' @export 
 #' @examples
@@ -78,7 +78,7 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
 #' data(pandaToyData)
 #' data(pandaResult)
 #' regnet = slot(pandaResult,"regNet")
-#' with(pandaToyData, testMotif(regnet, motif, mode="augment", expression,ppi, hamming=1))
+#' with(pandaToyData, testMotif(regnet, motif, mode="augment", expression, ppi, hamming=1))
 #'
 testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   if(!mode%in%c("augment","remove")){
@@ -90,14 +90,14 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   false.idx <- c()
   if (mode=="augment") {
     tf.idx = list()
-    chip.seq.table <- table(motif[,1])
-    for (tf in names(chip.seq.table)) {
+    motif.table <- table(motif[,1])
+    for (tf in names(motif.table)) {
       tf.idx[[tf]] <- which(net$TF==tf)
     }
     # sample net with same distribution of TFs as the motif data
-    for (i in 1:length(chip.seq.table)) {
-      tf <- names(chip.seq.table)[i]
-      false.idx <- c(false.idx, sample(tf.idx[[tf]], chip.seq.table[i]))
+    for (i in 1:length(motif.table)) {
+      tf <- names(motif.table)[i]
+      false.idx <- c(false.idx, sample(tf.idx[[tf]], motif.table[i]))
     }
     true.idx <- which(paste0(net$TF, net$Gene)%in%paste0(motif$TF, motif$Gene))
     false.idx <- setdiff(false.idx, true.idx)
@@ -112,16 +112,13 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   }
   panda.mod <- panda(motif.mod, expr, ppi, ...)
   reg.mod <- slot(panda.mod,"regNet")
-  rownames(reg.mod) = colnames(slot(panda.mod,"coopNet"))
-  colnames(reg.mod) = colnames(slot(panda.mod,"coregNet"))
-  
   net.mod <- melt.array(reg.mod)
   colnames(net.mod) <- c("TF", "Gene", "Score")
   
   net$x <- 1:nrow(net) %in% false.idx
   d <- merge(net, net.mod, by=c("TF", "Gene"), all.x=TRUE, sort=FALSE)
   d <- d[order(d$x),]
-  p = ggplot(d, aes(Score.x, Score.y, color=x==TRUE)) + geom_point(shape=1) +
+  p = ggplot(d, aes_string(x="Score.x", y="Score.y", color="x==TRUE")) + geom_point(shape=1) +
     xlab("Model network weights") + ylab("Modified network weights") +
     scale_color_discrete(name="", labels=c("Model edges", "False edges"))
   p
@@ -143,7 +140,7 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
 #' @importFrom ggplot2 ggplot
 #' @importFrom ggplot2 xlab
 #' @importFrom ggplot2 ylab
-#' @importFrom ggplot2 aes
+#' @importFrom ggplot2 aes_string
 #' @importFrom ggplot2 xlim
 #' @importFrom ggplot2 ylim
 #' @importFrom ggplot2 ggtitle
@@ -158,19 +155,17 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
 #' plotZbyTF(regnet,regnet, pandaToyData$motif, hasPrior=TRUE)
 #'
 plotZbyTF <- function(x, y, motif, hasPrior=TRUE){
-  chip.seq.table <- aggregate(motif[,3], list(TF=motif[,1]), sum)
-  chip.seq.counts <- data.frame(TF=chip.seq.table$TF, outdegree=chip.seq.table$x)
-  attach(chip.seq.counts)
-  chip.seq.counts <- chip.seq.counts[order(outdegree),]
-  quant <- quantile(outdegree)
-  chip.seq.counts$q <- 1
-  chip.seq.counts$q[which(outdegree>=quant[2])] <- 2
-  chip.seq.counts$q[which(outdegree>=quant[3])] <- 3
-  chip.seq.counts$q[which(outdegree>=quant[4])] <- 4
-  detach(chip.seq.counts)
+  motif.table <- aggregate(motif[,3], list(TF=motif[,1]), sum)
+  motif.counts <- data.frame(TF=motif.table$TF, outdegree=motif.table$x)
+  motif.counts <- motif.counts[order(motif.counts$outdegree),]
+  quant <- quantile(motif.counts$outdegree)
+  motif.counts$q <- 1
+  motif.counts$q[which(motif.counts$outdegree>=quant[2])] <- 2
+  motif.counts$q[which(motif.counts$outdegree>=quant[3])] <- 3
+  motif.counts$q[which(motif.counts$outdegree>=quant[4])] <- 4
   tfs.q <- list()
   for (i in 1:4){
-    tfs.q[[i]] <- subset(chip.seq.counts, q==i)$TF
+    tfs.q[[i]] <- motif.counts[motif.counts$q==i, ]$TF
   }
   x = melt.array(x)
   y = melt.array(y)
@@ -180,13 +175,13 @@ plotZbyTF <- function(x, y, motif, hasPrior=TRUE){
   pList <- list()
   
   if (!hasPrior) {
-    d <- subset(d, Motif==0)
+    d <- d[d$Motif==0, ]
   } else {
-    d <- subset(d, Motif > 0)
+    d <- d[d$Motif>0, ]
   }
   lim <- c(min(d$Z.x, d$Z.y), max(d$Z.x, d$Z.y))
   for (i in 1:4){
-    p <- ggplot(subset(d, TF%in%tfs.q[[i]]), aes(Z.x, Z.y)) +
+    p <- ggplot(d[d$TF%in%tfs.q[[i]], ], aes_string(x="Z.x", y="Z.y")) +
       geom_abline(intercept=0, slope=1, colour="red") + ggtitle("Q"%+%i) +
       xlim(lim) + ylim(lim)
     if (!hasPrior) {

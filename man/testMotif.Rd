@@ -35,6 +35,6 @@ and will check if they become pruned.
 data(pandaToyData)
 data(pandaResult)
 regnet = slot(pandaResult,"regNet")
-with(pandaToyData, testMotif(regnet, motif, mode="augment", expression,ppi, hamming=1))
+with(pandaToyData, testMotif(regnet, motif, mode="augment", expression, ppi, hamming=1))
 }
 

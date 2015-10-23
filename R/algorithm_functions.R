@@ -38,7 +38,7 @@
 #' @references
 #' Glass K, Huttenhower C, Quackenbush J, Yuan GC. Passing Messages Between Biological Networks
 #' to Refine Predicted Interactions. PLoS One. 2013 May 318(5):e64832.
-panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
+panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     iter=NA,output=c('regulatory','coexpression','cooperative'),
     zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
     scale.by.present=FALSE){
@@ -81,7 +81,7 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
 
     # Bad data checking
     if (num.genes==0){
-        stop("Error validating data.  No matched genes.\n  Please ensure that gene names in expression file match gene names in motif file.")
+        stop("Error validating data.  No matched genes.\n  Please ensure that gene names in expression data match gene names in motif data")
     }
 
     if(num.conditions==0) {
@@ -101,6 +101,11 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
         if(progress)
             print('Verified sufficient samples')
     }
+    
+    if (any(duplicated(motif))) {
+      warning("Duplicate edges have been found in the motif data. Weights will be summed.")
+      motif <- aggregate(motif[,3], by=list(motif[,1], motif[,2]), FUN=sum)
+    }
 
     # Prior Regulatory Network
     Idx1=match(motif[,1], tf.names);
@@ -108,12 +113,18 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.00001,
     Idx=(Idx2-1)*num.TFs+Idx1;
     regulatoryNetwork=matrix(data=0, num.TFs, num.genes);
     regulatoryNetwork[Idx]=motif[,3]
+    colnames(regulatoryNetwork) <- gene.names
+    rownames(regulatoryNetwork) <- tf.names
     
     # PPI data
     # If no ppi data is given, we use the identity matrix
     tfCoopNetwork <- diag(num.TFs)
     # Else we convert our two-column data.frame to a matrix
     if (!is.null(ppi)){
+      if (any(duplicated(ppi))) {
+        warning("Duplicate edges have been found in the PPI data. Weights will be summed.")
+        ppi <- aggregate(ppi[,3], by=list(ppi[,1], ppi[,2]), FUN=sum)
+      }
       Idx1 <- match(ppi[,1], tf.names);
       Idx2 <- match(ppi[,2], tf.names);
       Idx <- (Idx2-1)*num.TFs+Idx1;
@@ -190,6 +201,7 @@ prepResult <- function(zScale, output, regulatoryNetwork, geneCoreg, tfCoopNetwo
     res <- pandaObj(regNet=regulatoryNetwork, coregNet=geneCoreg, coopNet=tfCoopNetwork)
     res
 }
+
 normalizeNetwork<-function(X){
     X <- as.matrix(X)
 
@@ -226,8 +238,13 @@ normalizeNetwork<-function(X){
     # combine and return
     normMat=Z1/sqrt(2)+Z2/sqrt(2)
 
-    # Dan fix to NaN
-    normMat[is.na(normMat)]<-0
+    # checks and defaults for missing data
+    Z0=(X-mu0)/std0;
+    f1=is.na(Z1); f2=is.na(Z2);
+    normMat[f1]=Z2[f1]/sqrt(2)+Z0[f1]/sqrt(2);
+    normMat[f2]=Z1[f2]/sqrt(2)+Z0[f2]/sqrt(2);
+    normMat[f1 & f2]=2*Z0[f1 & f2]/sqrt(2);
+    
     normMat
 }
 
