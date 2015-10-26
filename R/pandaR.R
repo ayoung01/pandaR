@@ -5,5 +5,7 @@
 #' @docType package
 #' @name pandaR
 #' @importFrom RUnit checkTrue
+#' @import methods
+#' @import BiocGenerics
 NULL
 #> NULL
