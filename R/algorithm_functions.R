@@ -211,11 +211,11 @@ normalizeNetwork<-function(X){
 
     # overall values
     mu0=mean(X)
-    std0=sd(X)
+    std0=sd(X)*sqrt((nr*nc-1)/(nr*nc))
 
     # operations on rows
     mu1=rowMeans(X) # operations on rows
-    std1=rowSds(X)*sqrt((dim(X)[2]-1)/dim(X)[2])
+    std1=rowSds(X)*sqrt((nc-1)/nc)
     
     mu1=rep(mu1, nc)
     dim(mu1) = dm
