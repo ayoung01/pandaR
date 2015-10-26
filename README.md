@@ -9,3 +9,9 @@ The PANDA approach is to model the regulatory network as a bipartite network and
 This package provides a straightforward tool for applying this established method.
 
 Glass K, Huttenhower C, Quackenbush J, Yuan GC. Passing Messages Between Biological Networks to Refine Predicted Interactions, PLoS One, 2013 May 31;8(5):e64832
+
+To get the latest development version:
+```r
+install.packages("devtools")
+devtools::install_github("Quackenbush/pandaR")
+```
