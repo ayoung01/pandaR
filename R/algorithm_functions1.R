@@ -11,7 +11,7 @@
 #' transcription factor 2 (column 2) and a score (column 3) for the interaction.
 #' @param alpha value to be used for update variable, alpha (default=0.1)
 #' @param hamming value at which to terminate the process based on hamming distance (default 10^-5)
-#' @param iter sets the maximum number of iterations PANDA can run before exiting.
+#' @param k sets the maximum number of iterations PANDA can run before exiting.
 #' @param progress Boolean to indicate printing of output for algorithm progress.
 #' @param output a vector containing which networks to return.  Options include "regulatory",
 #' "coregulatory", "cooperative".
@@ -19,12 +19,7 @@
 #' @param randomize method by which to randomize gene expression matrix.  Default "None".  Must
 #' be one of "None", "within.gene", "by.genes".  "within.gene" randomization scrambles each row
 #' of the gene expression matrix, "by.gene" scrambles gene labels.
-#' @param cor.method Correlation method, default is "pearson".
-#' @param scale.by.present Boolean to indicate scaling of correlations by percentage of positive samples. 
 #' @keywords keywords
-#' @importFrom matrixStats rowSds
-#' @importFrom matrixStats colSds
-#' @importFrom Biobase assayData
 #' @export
 #' @return An object of class "panda" containing matrices describing networks achieved by convergence
 #' with PANDA algorithm.\cr
@@ -38,50 +33,63 @@
 #' @references
 #' Glass K, Huttenhower C, Quackenbush J, Yuan GC. Passing Messages Between Biological Networks
 #' to Refine Predicted Interactions. PLoS One. 2013 May 318(5):e64832.
-panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
-    iter=NA,output=c('regulatory','coexpression','cooperative'),
-    zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
-    scale.by.present=FALSE){
-
+panda <- function( motif,
+                expr=NULL,
+                ppi=NULL,
+                alpha=0.1,
+                hamming=0.00001,
+                k=NA,
+                output=c('regulatory','coexpression','cooperative'),
+                zScale=TRUE,
+                progress=FALSE,
+                randomize="None"){
     if(progress)
         print('Initializing and validating')
+    exprData  <- expr
+    motifData <- motif
+    ppiData   <- ppi
 
     if(class(expr)=="ExpressionSet")
-        expr <- assayData(expr)[["exprs"]]
+        exprData <- expr@assayData
 
-    # Create vectors for TF names and Gene names from motif dataset
-    tf.names   <- sort(unique(motif[,1]))
-    gene.names <- sort(unique(rownames(expr)))
+    # Create vectors for TF names and Gene names from Motif dataset
+    tf.names   <- sort(unique(motifData[,1]))
     num.TFs    <- length(tf.names)
-    num.genes  <- length(gene.names)
-
-    if (is.null(expr)){
+    if (is.null(exprData)){
         # Use only the motif data here for the gene list
+        gene.names <- sort(unique(motifData[,2]))
+        num.genes  <- length(gene.names)
         num.conditions <- 0
         if (randomize!="None"){
-          warning("Randomization ignored because gene expression is not used.")
-          randomize <- "None"
+            warning("Randomization ignored because gene expression is not used.")
+            randomize <- "None"
         }
     } else {
         # Use the motif data AND the expr data (if provided) for the gene list
+        gene.names <- sort(intersect(motifData[,2],rownames(exprData)))
+        num.genes  <- length(gene.names)
+
+        # Filter out the expr genes without motif data
+        exprData <- exprData[rownames(exprData) %in% gene.names,]
+
         # Keep everything sorted alphabetically
-        expr <- expr[order(rownames(expr)),]
-        num.conditions <- ncol(expr)
+        exprData      <- exprData[order(rownames(exprData)),]
+        num.conditions <- ncol(exprData)
         if (randomize=='within.gene'){
-          expr <- t(apply(expr, 1, sample))
-          if(progress)
-            print("Randomizing by reordering each gene's expression")
+            exprData <- t(apply(exprData, 1, sample))
+            if(progress)
+                print("Randomizing by reordering each gene's expression")
         } else if (randomize=='by.genes'){
-          rownames(expr) <- sample(rownames(expr))
-          expr           <- expr[order(rownames(expr)),]
-          if(progress)
-            print("Randomizing by reordering each gene labels")
+            rownames(exprData) <- sample(rownames(exprData))
+            exprData           <- exprData[order(rownames(exprData)),]
+            if(progress)
+                print("Randomizing by reordering each gene labels")
         }
     }
 
     # Bad data checking
     if (num.genes==0){
-        stop("Error validating data.  No matched genes.\n  Please ensure that gene names in expression data match gene names in motif data")
+        stop("Error validating data.  No matched genes.\n  Please ensure that gene names in expression file match gene names in motif file.")
     }
 
     if(num.conditions==0) {
@@ -91,47 +99,39 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
         warning('Not enough expression conditions detected to calculate correlation. Co-regulation network will be initialized to an identity matrix.')
         geneCoreg <- diag(num.genes)
     } else {
-        
-        if(scale.by.present){
-            num.positive=(expr>0)%*%t((expr>0))
-            geneCoreg <- cor(t(expr), method=cor.method, use="pairwise.complete.obs")*(num.positive/num.conditions)
-        } else {
-            geneCoreg <- cor(t(expr), method=cor.method, use="pairwise.complete.obs")
-        }
+        geneCoreg <- cor(t(exprData), method="pearson", use="pairwise.complete.obs")
         if(progress)
             print('Verified sufficient samples')
     }
-    
-    if (any(duplicated(motif))) {
-      warning("Duplicate edges have been found in the motif data. Weights will be summed.")
-      motif <- aggregate(motif[,3], by=list(motif[,1], motif[,2]), FUN=sum)
+
+
+    # If no ppi data is given, we use the identity matrix
+    if (is.null(ppiData)){
+        ppiData <- diag(num.TFs)
     }
 
-    # Prior Regulatory Network
-    Idx1=match(motif[,1], tf.names);
-    Idx2=match(motif[,2], gene.names);
-    Idx=(Idx2-1)*num.TFs+Idx1;
-    regulatoryNetwork=matrix(data=0, num.TFs, num.genes);
-    regulatoryNetwork[Idx]=motif[,3]
-    colnames(regulatoryNetwork) <- gene.names
-    rownames(regulatoryNetwork) <- tf.names
-    
-    # PPI data
-    # If no ppi data is given, we use the identity matrix
-    tfCoopNetwork <- diag(num.TFs)
-    # Else we convert our two-column data.frame to a matrix
-    if (!is.null(ppi)){
-      if (any(duplicated(ppi))) {
-        warning("Duplicate edges have been found in the PPI data. Weights will be summed.")
-        ppi <- aggregate(ppi[,3], by=list(ppi[,1], ppi[,2]), FUN=sum)
-      }
-      Idx1 <- match(ppi[,1], tf.names);
-      Idx2 <- match(ppi[,2], tf.names);
-      Idx <- (Idx2-1)*num.TFs+Idx1;
-      tfCoopNetwork[Idx] <- ppi[,3];
-      Idx <- (Idx1-1)*num.TFs+Idx2;
-      tfCoopNetwork[Idx] <- ppi[,3];
+    # Convert 3 column format to matrix format
+    regulatoryNetwork <- spreadNet(motifData)
+
+    # sort the genes (columns)
+    regulatoryNetwork <- as.matrix(regulatoryNetwork[,order(colnames(regulatoryNetwork))])
+
+    # Filter out any motifs that are not in expr dataset (if given)
+    if (!is.null(exprData)){
+        regulatoryNetwork <- regulatoryNetwork[,colnames(regulatoryNetwork) %in% gene.names]
     }
+
+    # store initial motif network (alphabetized for rows and columns)
+    starting.motifs <- regulatoryNetwork
+
+    # ppiData Data
+    tfCoopNetwork=diag(num.TFs)
+    Idx1=match(ppiData[,1], tf.names)
+    Idx2=match(ppiData[,2], tf.names)
+    Idx=(Idx2-1)*num.TFs+Idx1
+    tfCoopNetwork[Idx[!is.na(Idx)]]=as.numeric(ppiData[,3])[!is.na(Idx)]
+    Idx=(Idx1-1)*num.TFs+Idx2
+    tfCoopNetwork[Idx[!is.na(Idx)]]=as.numeric(ppiData[,3])[!is.na(Idx)]
     colnames(tfCoopNetwork) <- tf.names
     rownames(tfCoopNetwork) <- tf.names
 
@@ -140,37 +140,32 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
 
     if(progress)
         print('Normalizing networks...')
-    regulatoryNetwork = normalizeNetwork(regulatoryNetwork)
-    tfCoopNetwork     = normalizeNetwork(tfCoopNetwork)
-    geneCoreg         = normalizeNetwork(geneCoreg)
+    regulatoryNetwork=normalizeNetwork(regulatoryNetwork)
+    tfCoopNetwork=normalizeNetwork(tfCoopNetwork)
+    geneCoreg=normalizeNetwork(geneCoreg)
 
     if(progress)
         print('Leaning Network...')
-
-    minusAlpha = 1-alpha
     step=0
     hamming_cur=1
     if(progress)
         print("Using tanimoto similarity")
     while(hamming_cur>hamming){
-        if ((!is.na(iter))&&step>=iter){
-            print(paste("Reached maximum iterations, iter =",iter),sep="")
-            break
+        if ((!is.na(k))&&step>=k){
+            stop(paste("Reached maximum iterations, k =",k),sep="")
         }
         Responsibility=tanimoto(tfCoopNetwork, regulatoryNetwork)
         Availability=tanimoto(regulatoryNetwork, geneCoreg)
-        RA = 0.5*(Responsibility+Availability)
+        hamming_cur=sum(abs(regulatoryNetwork-0.5*(Responsibility+Availability)))/(num.TFs*num.genes)
+        regulatoryNetwork=(1-alpha)*regulatoryNetwork+alpha*0.5*(Responsibility+Availability)
 
-        hamming_cur=sum(abs(regulatoryNetwork-RA))/(num.TFs*num.genes)
-        regulatoryNetwork=minusAlpha*regulatoryNetwork + alpha*RA
-
-        ppi=tanimoto(regulatoryNetwork, t(regulatoryNetwork))
-        ppi=update.diagonal(ppi, num.TFs, alpha, step)
-        tfCoopNetwork=minusAlpha*tfCoopNetwork + alpha*ppi
+        ppiData=tanimoto(regulatoryNetwork, t(regulatoryNetwork))
+        ppiData=update.diagonal(ppiData, num.TFs, alpha, step)
+        tfCoopNetwork=(1-alpha)*tfCoopNetwork+alpha*ppiData
 
         CoReg2=tanimoto(t(regulatoryNetwork), regulatoryNetwork)
         CoReg2=update.diagonal(CoReg2, num.genes, alpha, step)
-        geneCoreg=minusAlpha*geneCoreg + alpha*CoReg2
+        geneCoreg=(1-alpha)*geneCoreg+alpha*CoReg2
 
         if(progress)
             message("Iteration", step,": hamming distance =", round(hamming_cur,5))
@@ -184,6 +179,7 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
 }
 
 prepResult <- function(zScale, output, regulatoryNetwork, geneCoreg, tfCoopNetwork){
+
     resList <- list()
     if (!zScale){
         regulatoryNetwork <- pnorm(regulatoryNetwork)
@@ -202,75 +198,45 @@ prepResult <- function(zScale, output, regulatoryNetwork, geneCoreg, tfCoopNetwo
     res <- pandaObj(regNet=regulatoryNetwork, coregNet=geneCoreg, coopNet=tfCoopNetwork)
     res
 }
-
 normalizeNetwork<-function(X){
     X <- as.matrix(X)
 
-    nr = nrow(X)
-    nc = ncol(X)
-    dm = c(nr,nc)
-
     # overall values
     mu0=mean(X)
-    std0=sd(X)*sqrt((nr*nc-1)/(nr*nc))
+    std0=sd(X)
 
     # operations on rows
-    mu1=rowMeans(X) # operations on rows
-    std1=rowSds(X)*sqrt((nc-1)/nc)
-    
-    mu1=rep(mu1, nc)
-    dim(mu1) = dm
-    std1=rep(std1,nc)
-    dim(std1)= dm
-
+    mu1=apply(X,1,mean) # operations on rows
+    std1=apply(X,1,sd)*sqrt((dim(X)[2]-1)/dim(X)[2])
+    mu1=matrix(rep(mu1, dim(X)[2]), dim(X))
+    std1=matrix(rep(std1, dim(X)[2]), dim(X))
     Z1=(X-mu1)/std1
 
     # operations on columns
-    mu2=colMeans(X) # operations on columns
-    std2=colSds(X)*sqrt((nr-1)/nr)
-    
-    mu2 = rep(mu2, each=nr)
-    dim(mu2) = dm
-    std2= rep(std2, each=nr)
-    dim(std2) = dm
-
+    mu2=apply(X,2,mean) # operations on columns
+    std2=apply(X,2,sd)*sqrt((dim(X)[1]-1)/dim(X)[1])
+    mu2=matrix(rep(mu2, each=dim(X)[1]), dim(X))
+    std2=matrix(rep(std2, each=dim(X)[1]), dim(X))
     Z2=(X-mu2)/std2
 
     # combine and return
     normMat=Z1/sqrt(2)+Z2/sqrt(2)
 
-    # checks and defaults for missing data
-    Z0=(X-mu0)/std0;
-    f1=is.na(Z1); f2=is.na(Z2);
-    normMat[f1]=Z2[f1]/sqrt(2)+Z0[f1]/sqrt(2);
-    normMat[f2]=Z1[f2]/sqrt(2)+Z0[f2]/sqrt(2);
-    normMat[f1 & f2]=2*Z0[f1 & f2]/sqrt(2);
-    
+    # Dan fix to NaN
+    normMat[is.na(normMat)]<-0
     normMat
 }
 
 tanimoto<-function(X,Y){
-
-    nc = ncol(Y)
-    nr = nrow(X)
-    dm = c(nr,nc)
-
     Amat=(X %*% Y)
-    Bmat=colSums(Y*Y)
-    
-    Bmat = rep(Bmat,each=nr)
-    dim(Bmat) = dm
-    #Bmat=matrix(rep(Bmat, each=nr), dm)
+    Bmat=apply(Y*Y,2,sum)
+    Bmat=matrix(rep(Bmat, each=dim(X)[1]), dim(Amat))
+    Cmat=apply(X*X,1,sum)
+    Cmat=matrix(rep(Cmat, dim(Y)[2]), dim(Amat))
 
-    Cmat=rowSums(X*X)
-    Cmat=rep(Cmat,nc)
-    dim(Cmat) = dm
-    #Cmat=matrix(rep(Cmat, nc), dm)
+    Amat=Amat/sqrt(Bmat+Cmat-abs(Amat))
 
-    den = (Bmat+Cmat-abs(Amat))
-    Amat=Amat/sqrt(den)
-
-    return(Amat)
+    Amat
 }
 
 dFunction<-function(X,Y){
@@ -279,12 +245,12 @@ dFunction<-function(X,Y){
     A
 }
 
+
 update.diagonal<-function(diagMat, num, alpha, step){
-    seqs = seq(1, num*num, num+1)
-    diagMat[seqs]=NaN;
-    diagstd=rowSds(diagMat,na.rm=TRUE)*sqrt( (num-2)/(num-1) );
-    diagMat[seqs]=diagstd*num*exp(2*alpha*step);
-    return(diagMat);
+    diagMat[seq(1, num*num, num+1)]=NaN
+    diagstd=apply(diagMat,2,sd,na.rm=TRUE)*sqrt((num-2)/(num-1))
+    diagMat[seq(1, num*num, num+1)]=diagstd*num*exp(2*alpha*step)
+    diagMat
 }
 
 spreadNet <- function(df){
@@ -366,11 +332,11 @@ subnetwork <- function(x, nodes, subTf=TRUE){
     }
     if (subTf){
         subnet <- x@regNet[nodes,]
-        edgeexists <- colSums(subnet)>0
+        edgeexists <- apply(subnet,2,sum)>0
         subnet <- subnet[,edgeexists]
     } else {
         subnet <- x@regNet[,nodes]
-        edgeexists <- rowSums(subnet)>0
+        edgeexists <- apply(subnet,1,sum)>0
         subnet <- subnet[edgeexists,]
     }
     subnet
@@ -402,10 +368,11 @@ targetedGenes <- function(x, tfs){
         stop
     }
     subnet <- x@regNet[tfs,,drop=FALSE]
-    edgeexists <- colSums(subnet)>0
+    edgeexists <- apply(subnet,2,sum)>0
     targeted <- colnames(x@regNet)[edgeexists]
     targeted
 }
+
 
 #' Plot graph
 #'
@@ -413,8 +380,6 @@ targetedGenes <- function(x, tfs){
 #'
 #' @param x an object of class "panda"
 #' @keywords keywords
-#' @importFrom igraph graph.incidence
-#' @importFrom igraph layout.bipartite
 #' @export
 #' @return An matrix describing the subsetted bipartite network.
 #' @examples
@@ -431,5 +396,8 @@ targetedGenes <- function(x, tfs){
 #' subnet.pandaRes <- subnetwork(topPandaRes,c("AR","ARID3A","ELK1"))
 #' plotGraph(subnet.pandaRes)
 plotGraph <- function(x){
-    plot(graph.incidence(x), layout=layout.bipartite)
+    if(require('igraph'))
+        plot(igraph::graph.incidence(x), layout=igraph::layout.bipartite)
+    else
+        stop
 }
