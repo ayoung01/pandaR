@@ -13,5 +13,5 @@ Glass K, Huttenhower C, Quackenbush J, Yuan GC. Passing Messages Between Biologi
 To get the latest development version:
 ```r
 install.packages("devtools")
-devtools::install_github("Quackenbush/pandaR")
+devtools::install_github("QuackenbushLab/pandaR")
 ```
