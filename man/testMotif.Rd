@@ -4,12 +4,11 @@
 \alias{testMotif}
 \title{Check motif}
 \usage{
-testMotif(x, mode, motif, expr, ppi, prop = 0.05, seed = 1, ...)
+testMotif(x, motif, expr, ppi, mode = c("augment", "remove"), prop = 0.05,
+  seed = 1, ...)
 }
 \arguments{
 \item{x}{Model regulatory network.}
-
-\item{mode}{either "augment" to add random edges or "remove" to remove random edges.}
 
 \item{motif}{Motif used to construct the model regulatory network.}
 
@@ -17,7 +16,9 @@ testMotif(x, mode, motif, expr, ppi, prop = 0.05, seed = 1, ...)
 
 \item{ppi}{PPI used to construct model regulatory network.}
 
-\item{prop}{Number of edges to augment regulatory prior, as a proportion of the number
+\item{mode}{a character string - either "augment" to add random edges or "remove" to remove random edges.}
+
+\item{prop}{numeric specifying number of edges to augment or remove from regulatory prior, as a proportion of the number
 of edges in the regulatory prior.}
 
 \item{seed}{Random seed.}
