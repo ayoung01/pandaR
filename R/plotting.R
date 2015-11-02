@@ -57,11 +57,11 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
 #' and will check if they become pruned.
 #'
 #' @param x Model regulatory network.
-#' @param mode either "augment" to add random edges or "remove" to remove random edges.
 #' @param motif Motif used to construct the model regulatory network.
 #' @param expr Expression matrix used to construct model network.
 #' @param ppi PPI used to construct model regulatory network.
-#' @param prop Number of edges to augment regulatory prior, as a proportion of the number
+#' @param mode a character string - either "augment" to add random edges or "remove" to remove random edges.
+#' @param prop numeric specifying number of edges to augment or remove from regulatory prior, as a proportion of the number
 #'         of edges in the regulatory prior.
 #' @param seed Random seed.
 #' @param ... Options for the panda function.
@@ -80,10 +80,8 @@ plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
 #' regnet = slot(pandaResult,"regNet")
 #' with(pandaToyData, testMotif(regnet, motif, mode="augment", expression, ppi, hamming=1))
 #'
-testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
-  if(!mode%in%c("augment","remove")){
-    stop("mode must be set to either 'augment' or 'remove'")
-  }
+testMotif <- function(x,motif,expr,ppi,mode=c("augment","remove"),prop=0.05,seed=1,...) {
+  mode <- match.arg(mode)
   net <- melt.array(x)
   colnames(motif) <- colnames(net) <- c("TF", "Gene", "Score")
   set.seed(seed)
@@ -108,6 +106,8 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   if (mode=="remove") {
     rm.idx <- sample(nrow(motif), nrow(motif) * prop)
     motif.mod <- motif[-rm.idx,]
+    # remove randomly selected TFs from PPI
+    ppi <- ppi[which(ppi[,1]%in%motif.mod$TF & ppi[,2]%in%motif.mod$TF),]
     false.idx <- which(paste0(net$TF, net$Gene)%in%paste0(motif[rm.idx,]$TF, motif[rm.idx,]$Gene))
   }
   panda.mod <- panda(motif.mod, expr, ppi, ...)
@@ -118,7 +118,7 @@ testMotif <- function(x,mode,motif,expr,ppi,prop=0.05,seed=1,...) {
   net$x <- 1:nrow(net) %in% false.idx
   d <- merge(net, net.mod, by=c("TF", "Gene"), all.x=TRUE, sort=FALSE)
   d <- d[order(d$x),]
-  p = ggplot(d, aes_string(x="Score.x", y="Score.y", color="x==TRUE")) + geom_point(shape=1) +
+  p <- ggplot(d, aes_string(x="Score.x", y="Score.y", color="x==TRUE")) + geom_point(shape=1) +
     xlab("Model network weights") + ylab("Modified network weights") +
     scale_color_discrete(name="", labels=c("Model edges", "False edges"))
   p
