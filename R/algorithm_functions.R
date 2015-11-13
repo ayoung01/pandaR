@@ -20,7 +20,8 @@
 #' be one of "None", "within.gene", "by.genes".  "within.gene" randomization scrambles each row
 #' of the gene expression matrix, "by.gene" scrambles gene labels.
 #' @param cor.method Correlation method, default is "pearson".
-#' @param scale.by.present Boolean to indicate scaling of correlations by percentage of positive samples. 
+#' @param scale.by.present Boolean to indicate scaling of correlations by percentage of positive samples.
+#' @param edgelist Boolean to indicate if edge lists instead of matrices should be returned. 
 #' @keywords keywords
 #' @importFrom matrixStats rowSds
 #' @importFrom matrixStats colSds
@@ -41,7 +42,7 @@
 panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     iter=NA,output=c('regulatory','coexpression','cooperative'),
     zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
-    scale.by.present=FALSE){
+    scale.by.present=FALSE, edgelist=FALSE){
 
     if(progress)
         print('Initializing and validating')
@@ -145,7 +146,7 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     geneCoreg         = normalizeNetwork(geneCoreg)
 
     if(progress)
-        print('Leaning Network...')
+        print('Learning Network...')
 
     minusAlpha = 1-alpha
     step=0
@@ -191,16 +192,27 @@ prepResult <- function(zScale, output, regulatoryNetwork, geneCoreg, tfCoopNetwo
         tfCoopNetwork     <- pnorm(tfCoopNetwork)
     }
     if("regulatory"%in%output){
-        resList$regNet <- regulatoryNetwork
+      if(edgelist){
+        regulatoryNetwork <- melt.array(regulatoryNetwork)
+        colnames(regulatoryNetwork) <- c("TF", "Gene", "Weight")
+      }
+      resList$regNet <- regulatoryNetwork
     }
     if("coregulatory"%in%output){
-        resList$coregNet <- geneCoreg
+      if(edgelist){
+        geneCoreg <- melt.array(geneCoreg)
+        colnames(geneCoreg) <- c("Gene.x", "Gene.y", "Weight")
+      }
+      resList$coregNet <- geneCoreg
     }
     if("cooperative"%in%output){
-        resList$coopNet <- tfCoopNetwork
+      if(edgelist){
+        tfCoopNetwork <- melt.array(tfCoopNetwork)
+        colnames(tfCoopNetwork) <- c("TF.x", "TF.y", "Weight")
+      }
+      resList$coopNet <- tfCoopNetwork
     }
-    res <- pandaObj(regNet=regulatoryNetwork, coregNet=geneCoreg, coopNet=tfCoopNetwork)
-    res
+    pandaObj(regNet=regulatoryNetwork, coregNet=geneCoreg, coopNet=tfCoopNetwork)
 }
 
 normalizeNetwork<-function(X){

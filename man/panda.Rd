@@ -7,7 +7,7 @@
 panda(motif, expr = NULL, ppi = NULL, alpha = 0.1, hamming = 0.001,
   iter = NA, output = c("regulatory", "coexpression", "cooperative"),
   zScale = TRUE, progress = FALSE, randomize = "None",
-  cor.method = "pearson", scale.by.present = FALSE)
+  cor.method = "pearson", scale.by.present = FALSE, edgelist = FALSE)
 }
 \arguments{
 \item{motif}{A motif dataset, a data.frame, matrix or exprSet containing 3 columns.
@@ -40,6 +40,8 @@ of the gene expression matrix, "by.gene" scrambles gene labels.}
 \item{cor.method}{Correlation method, default is "pearson".}
 
 \item{scale.by.present}{Boolean to indicate scaling of correlations by percentage of positive samples.}
+
+\item{edgelist}{Boolean to indicate if edge lists instead of matrices should be returned.}
 }
 \value{
 An object of class "panda" containing matrices describing networks achieved by convergence
