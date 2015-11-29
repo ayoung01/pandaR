@@ -4,7 +4,7 @@
 \alias{plotZ}
 \title{Comparison of Z scores between two PANDA runs}
 \usage{
-plotZ(x, y, hex = TRUE, bins = 200, addLine = TRUE)
+plotZ(x, y, hex = TRUE, bins = 200, addLine = TRUE, rank = FALSE)
 }
 \arguments{
 \item{x}{PANDA object - output of the \code{panda} function.}
@@ -16,6 +16,8 @@ plotZ(x, y, hex = TRUE, bins = 200, addLine = TRUE)
 \item{bins}{Number of bins to use for plotting.}
 
 \item{addLine}{TRUE/FALSE - to add y=x line.}
+
+\item{rank}{TRUE/FALSE - If TRUE, plot rank of edge weights rather than weight values.}
 }
 \value{
 ggplot comparing the Z-scores between the two networks.
@@ -28,15 +30,14 @@ constructions or other parameters.
 \examples{
 data(pandaResult)
 data(pandaToyData)
-pandaRes = pandaRes2 = pandaResult
+pandaRes <- pandaRes2 <- pandaResult
 plotZ(pandaRes, pandaRes2)
 
 \donttest{
 panda.res1 <- with(pandaToyData, panda(motif, expression, ppi, hamming=1))
 panda.res2 <- with(pandaToyData, panda(motif, expression +
                    rnorm(prod(dim(expression)),sd=5), ppi, hamming=1))
-p = plotZ(panda.res1, panda.res2,addLine=FALSE)
-p + theme_bw()
+plotZ(panda.res1, panda.res2,addLine=FALSE)
 }
 }
 

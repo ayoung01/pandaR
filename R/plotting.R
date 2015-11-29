@@ -9,6 +9,7 @@
 #' @param hex TRUE/FALSE - If TRUE, bin data points to avoid over plotting.
 #' @param bins Number of bins to use for plotting.
 #' @param addLine  TRUE/FALSE - to add y=x line.
+#' @param rank TRUE/FALSE - If TRUE, plot rank of edge weights rather than weight values.
 #' @return ggplot comparing the Z-scores between the two networks.
 #' @importFrom reshape melt.array
 #' @importFrom ggplot2 ggplot
@@ -23,24 +24,27 @@
 #' 
 #' data(pandaResult)
 #' data(pandaToyData)
-#' pandaRes = pandaRes2 = pandaResult
+#' pandaRes <- pandaRes2 <- pandaResult
 #' plotZ(pandaRes, pandaRes2)
 #'
 #' \donttest{
 #' panda.res1 <- with(pandaToyData, panda(motif, expression, ppi, hamming=1))
 #' panda.res2 <- with(pandaToyData, panda(motif, expression + 
 #'                    rnorm(prod(dim(expression)),sd=5), ppi, hamming=1))
-#' p = plotZ(panda.res1, panda.res2,addLine=FALSE)
-#' p + theme_bw()
+#' plotZ(panda.res1, panda.res2,addLine=FALSE)
 #' }
 #'
-plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE){
+plotZ <- function(x,y,hex=TRUE,bins=200,addLine=TRUE,rank=FALSE){
   x = melt.array(slot(x,"regNet"))
   y = melt.array(slot(y,"regNet"))
   d <- merge(x,y,by=colnames(x)[1:2])
+  if (rank) {
+    d$value.x <- rank(-d$value.x)
+    d$value.y <- rank(-d$value.y)
+  }
   p <- ggplot(d, aes_string(x="value.x", y="value.y")) +
-    xlab("Network 1 Z-score") + ylab("Network 2 Z-score")
-    # Should update these to say Network X and Network Y...
+    xlab(sprintf("Network X %s", ifelse(rank, "rank", "Z-score"))) +
+    ylab(sprintf("Network Y %s", ifelse(rank, "rank", "Z-score")))
   if (addLine) {
     p <- p + geom_abline(slope=1, col="red")
   }
