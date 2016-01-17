@@ -9,7 +9,9 @@ panda(motif, expr = NULL, ppi = NULL, alpha = 0.1, hamming = 0.001,
   zScale = TRUE, progress = FALSE, randomize = "None",
   cor.method = "pearson", scale.by.present = FALSE, edgelist = FALSE,
   remove.missing.ppi = FALSE, remove.missing.motif = FALSE,
-  remove.missing.genes = FALSE)
+  remove.missing.genes = FALSE, normalize.reg = TRUE,
+  availability.weight = 0.5, abs.cor = FALSE, z.cutoff = NULL,
+  convergence.rate = 1, decay.alpha = FALSE)
 }
 \arguments{
 \item{motif}{A motif dataset, a data.frame, matrix or exprSet containing 3 columns.
@@ -53,6 +55,19 @@ expression data should be removed.}
 
 \item{remove.missing.genes}{Boolean to indicate whether genes in the expression data but lacking
 information from the motif prior should be removed.}
+
+\item{normalize.reg}{Boolean to indicate whether the input regulatory prior should be normalized before
+the main function loop.}
+
+\item{availability.weight}{value between 0 and 1 to weight availability in the W update}
+
+\item{abs.cor}{if TRUE, run PANDA using absolute value of correlation}
+
+\item{z.cutoff}{threshold of z-score in coregulatory matrix used to calculate Availability}
+
+\item{convergence.rate}{value that decreases convergence rate if between 0 and 1 and increases convergence rate if greater than 1}
+
+\item{decay.alpha}{if TRUE, decrease alpha after each iteration}
 }
 \value{
 An object of class "panda" containing matrices describing networks achieved by convergence

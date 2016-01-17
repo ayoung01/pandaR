@@ -21,13 +21,20 @@
 #' of the gene expression matrix, "by.gene" scrambles gene labels.
 #' @param cor.method Correlation method, default is "pearson".
 #' @param scale.by.present Boolean to indicate scaling of correlations by percentage of positive samples.
+#' @param edgelist Boolean to indicate if edge lists instead of matrices should be returned. 
 #' @param remove.missing.ppi Boolean to indicate whether TFs in the PPI but not in the motif data should be
 #' removed.
 #' @param remove.missing.motif Boolean to indicate whether genes targeted in the motif data but not the
 #' expression data should be removed.
 #' @param remove.missing.genes Boolean to indicate whether genes in the expression data but lacking
 #' information from the motif prior should be removed.
-#' @param edgelist Boolean to indicate if edge lists instead of matrices should be returned. 
+#' @param normalize.reg Boolean to indicate whether the input regulatory prior should be normalized before
+#' the main function loop.
+#' @param availability.weight value between 0 and 1 to weight availability in the W update
+#' @param abs.cor if TRUE, run PANDA using absolute value of correlation
+#' @param z.cutoff threshold of z-score in coregulatory matrix used to calculate Availability
+#' @param convergence.rate value that decreases convergence rate if between 0 and 1 and increases convergence rate if greater than 1
+#' @param decay.alpha if TRUE, decrease alpha after each iteration
 #' @keywords keywords
 #' @importFrom matrixStats rowSds
 #' @importFrom matrixStats colSds
@@ -50,10 +57,12 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     iter=NA,output=c('regulatory','coexpression','cooperative'),
     zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
     scale.by.present=FALSE,edgelist=FALSE,remove.missing.ppi=FALSE,
-    remove.missing.motif=FALSE,remove.missing.genes=FALSE){
+    remove.missing.motif=FALSE,remove.missing.genes=FALSE,
+    normalize.reg=TRUE,availability.weight=0.5,abs.cor=FALSE,
+    z.cutoff=NULL, convergence.rate=1, decay.alpha=FALSE){
 
     if(progress)
-        print('Initializing and validating')
+        message('Initializing and validating')
 
     if(class(expr)=="ExpressionSet")
         expr <- assayData(expr)[["exprs"]]
@@ -85,12 +94,12 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
         if (randomize=='within.gene'){
           expr <- t(apply(expr, 1, sample))
           if(progress)
-            print("Randomizing by reordering each gene's expression")
+            message("Randomizing by reordering each gene's expression")
         } else if (randomize=='by.genes'){
           rownames(expr) <- sample(rownames(expr))
           expr           <- expr[order(rownames(expr)),]
           if(progress)
-            print("Randomizing by reordering each gene labels")
+            message("Randomizing by reordering each gene labels")
         }
     }
     
@@ -119,8 +128,11 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
         } else {
             geneCoreg <- cor(t(expr), method=cor.method, use="pairwise.complete.obs")
         }
+        if(abs.cor) {
+          geneCoreg <- abs(geneCoreg)
+        }
         if(progress)
-            print('Verified sufficient samples')
+            message('Verified sufficient samples')
     }
     
     if (any(duplicated(motif))) {
@@ -166,37 +178,42 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     tic=proc.time()[3]
 
     if(progress)
-        print('Normalizing networks...')
-    regulatoryNetwork = normalizeNetwork(regulatoryNetwork)
-    tfCoopNetwork     = normalizeNetwork(tfCoopNetwork)
-    geneCoreg         = normalizeNetwork(geneCoreg)
+        message('Normalizing networks...')
+    if (normalize.reg) {
+      regulatoryNetwork <- normalizeNetwork(regulatoryNetwork)  
+    }
+    tfCoopNetwork <- normalizeNetwork(tfCoopNetwork)
+    geneCoreg <- normalizeNetwork(geneCoreg)
 
     if(progress)
-        print('Learning Network...')
+        message('Learning Network...')
 
     minusAlpha = 1-alpha
     step=0
     hamming_cur=1
     if(progress)
-        print("Using tanimoto similarity")
+        message("Using tanimoto similarity")
     while(hamming_cur>hamming){
         if ((!is.na(iter))&&step>=iter){
-            print(paste("Reached maximum iterations, iter =",iter),sep="")
+            message(paste("Reached maximum iterations, iter =",iter),sep="")
             break
         }
+        if (decay.alpha) {
+            alpha <- 1 / sqrt(step + 1)
+        }
         Responsibility=tanimoto(tfCoopNetwork, regulatoryNetwork)
-        Availability=tanimoto(regulatoryNetwork, geneCoreg)
-        RA = 0.5*(Responsibility+Availability)
+        Availability=tanimoto(regulatoryNetwork, geneCoreg, z.cutoff)
+        RA = (1-availability.weight)*Responsibility+availability.weight*Availability
 
         hamming_cur=sum(abs(regulatoryNetwork-RA))/(num.TFs*num.genes)
         regulatoryNetwork=minusAlpha*regulatoryNetwork + alpha*RA
 
         ppi=tanimoto(regulatoryNetwork, t(regulatoryNetwork))
-        ppi=update.diagonal(ppi, num.TFs, alpha, step)
+        ppi=update.diagonal(ppi, num.TFs, alpha, step, convergence.rate)
         tfCoopNetwork=minusAlpha*tfCoopNetwork + alpha*ppi
 
         CoReg2=tanimoto(t(regulatoryNetwork), regulatoryNetwork)
-        CoReg2=update.diagonal(CoReg2, num.genes, alpha, step)
+        CoReg2=update.diagonal(CoReg2, num.genes, alpha, step, convergence.rate)
         geneCoreg=minusAlpha*geneCoreg + alpha*CoReg2
 
         if(progress)
@@ -288,11 +305,15 @@ normalizeNetwork<-function(X){
     normMat
 }
 
-tanimoto<-function(X,Y){
+tanimoto<-function(X,Y, z.cutoff=NULL){
 
     nc = ncol(Y)
     nr = nrow(X)
     dm = c(nr,nc)
+    
+    if (!is.null(z.cutoff)) {
+      Y[Y<z.cutoff] <- 0
+    }
 
     Amat=(X %*% Y)
     Bmat=colSums(Y*Y)
@@ -318,11 +339,11 @@ dFunction<-function(X,Y){
     A
 }
 
-update.diagonal<-function(diagMat, num, alpha, step){
+update.diagonal<-function(diagMat, num, alpha, step, convergence.rate){
     seqs = seq(1, num*num, num+1)
     diagMat[seqs]=NaN;
     diagstd=rowSds(diagMat,na.rm=TRUE)*sqrt( (num-2)/(num-1) );
-    diagMat[seqs]=diagstd*num*exp(2*alpha*step);
+    diagMat[seqs]=diagstd*num*exp(2*alpha*step*convergence.rate);
     return(diagMat);
 }
 
