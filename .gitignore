@@ -4,3 +4,6 @@
 .Rproj
 *.Rproj
 .DS_Store
+packrat/lib*/
+.Rprofile
+packrat/

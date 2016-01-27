@@ -48,11 +48,12 @@
 #' to Refine Predicted Interactions. PLoS One. 2013 May 318(5):e64832.
 panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
     iter=NA,output=c('regulatory','coexpression','cooperative'),
-    zScale=TRUE,progress=FALSE,randomize="None",cor.method="pearson",
+    zScale=TRUE,progress=FALSE,randomize=c("None", "within.gene", "by.gene"),cor.method="pearson",
     scale.by.present=FALSE,edgelist=FALSE,remove.missing.ppi=FALSE,
     remove.missing.motif=FALSE,remove.missing.genes=FALSE){
 
-    if(progress)
+  randomize <- match.arg(randomize)  
+  if(progress)
         print('Initializing and validating')
 
     if(class(expr)=="ExpressionSet")
@@ -86,7 +87,7 @@ panda <- function(motif,expr=NULL,ppi=NULL,alpha=0.1,hamming=0.001,
           expr <- t(apply(expr, 1, sample))
           if(progress)
             print("Randomizing by reordering each gene's expression")
-        } else if (randomize=='by.genes'){
+        } else if (randomize=='by.gene'){
           rownames(expr) <- sample(rownames(expr))
           expr           <- expr[order(rownames(expr)),]
           if(progress)
