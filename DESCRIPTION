@@ -19,10 +19,10 @@ Imports:
     plyr,
     RUnit
 Suggests:
-    knitr
+    rmarkdown
 biocViews: StatisticalMethod, GraphAndNetwork, Microarray, GeneRegulation,
     NetworkInference, GeneExpression, Transcription, Network
-VignetteBuilder: knitr
+VignetteBuilder: rmarkdown
 License: GPL-2
 LazyData: true
 RoxygenNote: 5.0.1
